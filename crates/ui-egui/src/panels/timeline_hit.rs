@@ -56,6 +56,10 @@ pub enum Hit {
     WorkArea {
         edge: Option<Edge>,
     },
+    /// An In or Out mark on the timeline ruler.
+    InOut {
+        edge: Edge,
+    },
     Clip {
         track: TrackId,
         clip: ClipId,
@@ -125,10 +129,36 @@ pub fn work_area_at(seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Option
     })
 }
 
+/// The In or Out mark under the pointer on the timeline ruler if within reach (px).
+pub fn in_out_at(seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Edge> {
+    if !layout.ruler.contains(pos) {
+        return None;
+    }
+    let rate = seq.settings.frame_rate;
+    let zone = EDGE_PX;
+    let in_dist = seq.mark_in.map(|i| (layout.x_of(i) - pos.x).abs()).filter(|&d| d <= zone);
+    let out_dist = seq.mark_out.map(|o| (layout.x_of(o + rate.frame_duration()) - pos.x).abs()).filter(|&d| d <= zone);
+    match (in_dist, out_dist) {
+        (Some(di), Some(do_)) => {
+            if di <= do_ {
+                Some(Edge::In)
+            } else {
+                Some(Edge::Out)
+            }
+        }
+        (Some(_), None) => Some(Edge::In),
+        (None, Some(_)) => Some(Edge::Out),
+        (None, None) => None,
+    }
+}
+
 pub fn hit(seq: &Sequence, layout: &Layout, pos: Pos2) -> Hit {
     if layout.ruler.contains(pos) {
         if let Some(edge) = work_area_at(seq, layout, pos) {
             return Hit::WorkArea { edge };
+        }
+        if let Some(edge) = in_out_at(seq, layout, pos) {
+            return Hit::InOut { edge };
         }
         return Hit::Ruler;
     }
@@ -507,6 +537,20 @@ mod tests {
         seq.markers[1].duration = Tick(-1);
         assert!(marker_range_rect(&layout, &seq.markers[1]).is_none());
         assert_eq!(marker_under_pointer(&seq, &layout, at).unwrap().id.0, 9);
+    }
+
+    #[test]
+    fn in_out_marks_have_two_ends_and_hit_on_ruler() {
+        let (mut seq, l, _) = fixture(clips());
+        assert_eq!(hit(&seq, &l, pos2(200.0, 20.0)), Hit::Ruler);
+        seq.mark_in = Some(Tick::from_seconds_f64(2.0));
+        seq.mark_out = Some(Tick::from_seconds_f64(5.0));
+        let rate = seq.settings.frame_rate;
+        let xin = l.x_of(seq.mark_in.unwrap());
+        let xout = l.x_of(seq.mark_out.unwrap() + rate.frame_duration());
+        assert_eq!(hit(&seq, &l, pos2(xin, 20.0)), Hit::InOut { edge: Edge::In });
+        assert_eq!(hit(&seq, &l, pos2(xout, 20.0)), Hit::InOut { edge: Edge::Out });
+        assert_eq!(hit(&seq, &l, pos2((xin + xout) * 0.5, 20.0)), Hit::Ruler);
     }
 
     #[test]
