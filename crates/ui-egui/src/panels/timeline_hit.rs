@@ -134,6 +134,11 @@ pub fn in_out_at(seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Edge> {
     if !layout.ruler.contains(pos) {
         return None;
     }
+    let y_top = layout.ruler.min.y + 28.0;
+    let y_bot = layout.ruler.max.y - 3.0;
+    if pos.y < y_top || pos.y > y_bot {
+        return None;
+    }
     let rate = seq.settings.frame_rate;
     let zone = EDGE_PX;
     let in_dist = seq.mark_in.map(|i| (layout.x_of(i) - pos.x).abs()).filter(|&d| d <= zone);
@@ -542,15 +547,29 @@ mod tests {
     #[test]
     fn in_out_marks_have_two_ends_and_hit_on_ruler() {
         let (mut seq, l, _) = fixture(clips());
-        assert_eq!(hit(&seq, &l, pos2(200.0, 20.0)), Hit::Ruler);
+        assert_eq!(hit(&seq, &l, pos2(200.0, 32.0)), Hit::Ruler);
         seq.mark_in = Some(Tick::from_seconds_f64(2.0));
         seq.mark_out = Some(Tick::from_seconds_f64(5.0));
         let rate = seq.settings.frame_rate;
         let xin = l.x_of(seq.mark_in.unwrap());
         let xout = l.x_of(seq.mark_out.unwrap() + rate.frame_duration());
-        assert_eq!(hit(&seq, &l, pos2(xin, 20.0)), Hit::InOut { edge: Edge::In });
-        assert_eq!(hit(&seq, &l, pos2(xout, 20.0)), Hit::InOut { edge: Edge::Out });
-        assert_eq!(hit(&seq, &l, pos2((xin + xout) * 0.5, 20.0)), Hit::Ruler);
+        // Above the bracket vertical span (e.g. y = 20.0), clicks remain plain ruler hits for scrubbing
+        assert_eq!(hit(&seq, &l, pos2(xin, 20.0)), Hit::Ruler);
+        assert_eq!(hit(&seq, &l, pos2(xout, 20.0)), Hit::Ruler);
+        // Within the bracket vertical span (y = 32.0), handle hits are detected
+        assert_eq!(hit(&seq, &l, pos2(xin, 32.0)), Hit::InOut { edge: Edge::In });
+        assert_eq!(hit(&seq, &l, pos2(xout, 32.0)), Hit::InOut { edge: Edge::Out });
+        assert_eq!(hit(&seq, &l, pos2((xin + xout) * 0.5, 32.0)), Hit::Ruler);
+
+        // When handles overlap in close proximity, the closer handle wins
+        let t0 = Tick::from_seconds_f64(10.0);
+        seq.mark_in = Some(t0);
+        seq.mark_out = Some(t0);
+        let xin2 = l.x_of(seq.mark_in.unwrap());
+        let xout2 = l.x_of(seq.mark_out.unwrap() + rate.frame_duration());
+        let mid_x = (xin2 + xout2) * 0.5;
+        assert_eq!(hit(&seq, &l, pos2(mid_x + 1.0, 32.0)), Hit::InOut { edge: Edge::Out });
+        assert_eq!(hit(&seq, &l, pos2(mid_x - 1.0, 32.0)), Hit::InOut { edge: Edge::In });
     }
 
     #[test]

@@ -260,7 +260,7 @@ fn draw_in_out(app: &mut FilmcraftApp, ui: &egui::Ui, clip: &egui::Painter, layo
         clip.line_segment([pos2(x, y_bot), pos2(x + 5.0, y_bot)], Stroke::new(2.0, bracket_col));
         app.auto.add("timeline.range.in", Rect::from_min_max(pos2(x - 5.0, y_top), pos2(x + 5.0, y_bot)), "In point");
         let fmt = |tick: Tick| format_time(tick, rate, seq.settings.drop_frame, TimeDisplay::Timecode, 48000);
-        if ui.rect_contains_pointer(Rect::from_min_max(pos2(x - EDGE_PX, ruler.min.y), pos2(x + EDGE_PX, ruler.max.y)).intersect(ruler)) {
+        if ui.rect_contains_pointer(Rect::from_min_max(pos2(x - EDGE_PX, y_top), pos2(x + EDGE_PX, y_bot)).intersect(ruler)) {
             egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), egui::Id::unique("in-tip"), egui::PopupAnchor::Pointer).show(|ui| {
                 ui.label(tlf!("In: {tc}", tc = fmt(in_t)));
             });
@@ -273,7 +273,7 @@ fn draw_in_out(app: &mut FilmcraftApp, ui: &egui::Ui, clip: &egui::Painter, layo
         clip.line_segment([pos2(x, y_bot), pos2(x - 5.0, y_bot)], Stroke::new(2.0, bracket_col));
         app.auto.add("timeline.range.out", Rect::from_min_max(pos2(x - 5.0, y_top), pos2(x + 5.0, y_bot)), "Out point");
         let fmt = |tick: Tick| format_time(tick, rate, seq.settings.drop_frame, TimeDisplay::Timecode, 48000);
-        if ui.rect_contains_pointer(Rect::from_min_max(pos2(x - EDGE_PX, ruler.min.y), pos2(x + EDGE_PX, ruler.max.y)).intersect(ruler)) {
+        if ui.rect_contains_pointer(Rect::from_min_max(pos2(x - EDGE_PX, y_top), pos2(x + EDGE_PX, y_bot)).intersect(ruler)) {
             let out_tick = Tick(end_t.0.saturating_sub(rate.frame_duration().0).max(0));
             egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), egui::Id::unique("out-tip"), egui::PopupAnchor::Pointer).show(|ui| {
                 ui.label(tlf!("Out: {tc}", tc = fmt(out_tick)));
